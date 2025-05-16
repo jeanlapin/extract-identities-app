@@ -6,17 +6,16 @@ from io import BytesIO
 st.set_page_config(page_title="Extraction d'identités depuis texte web", layout="wide")
 st.title("🔍 Extraction d'identités depuis du texte web")
 st.markdown("""
-Collez ici le contenu d'une page web (copié avec Ctrl+A, Ctrl+C).
-Choisissez le mode d'extraction ci-dessous pour générer un fichier Excel structuré.
+Collez ici le contenu d'une page web (copié avec Ctrl+A, Ctrl+C).  
+Choisissez le mode d'extraction pour générer un fichier Excel structuré.
 """)
 
-# Mode 1 : Ambassade
-
+# --- Mode 1 : Extraction "Flag of ..." (ambassades)
 def extract_from_embassy_format(text):
     results = []
     text = re.sub(r'\s+', ' ', text)
     pattern = re.compile(
-        r'Flag of ([A-Za-z ]+?)\s+((?:Dr\.|Mr\.|Mrs\.|Ms\.)?\s*[A-Z][a-z\']+(?:\s[A-Z][a-z\'\-]+)*)\s*-\s*([A-Za-z \-\']+?)\s+(Embassy|Consulate|Permanent Mission)[^F]*',
+        r'Flag of ([A-Za-z ]+?)\s+((?:Dr\.|Mr\.|Mrs\.|Ms\.)?\s*[A-Z][a-z\'\-]+(?:\s[A-Z][a-z\'\-]+)*)\s*-\s*([A-Za-z \'\-]+?)\s+(Embassy|Consulate|Permanent Mission)[^F]*',
         re.IGNORECASE
     )
     matches = pattern.findall(text)
@@ -38,37 +37,55 @@ def extract_from_embassy_format(text):
         })
     return pd.DataFrame(results)
 
-# Mode 2 : Majuscules
-
-def extract_from_uppercase_names(text):
-    lines = re.findall(r'\b[A-Z]{2,}(?:\s+[A-Z]{2,})+\b', text)
-    seen = set()
+# --- Mode 2 : Extraction intelligente de noms (casse libre + enrichissement)
+def extract_flexible_names(text):
     results = []
-    for line in lines:
-        if line not in seen:
-            seen.add(line)
-            parts = line.strip().split()
-            prenom = parts[0].lower() if parts else ""
-            nom = parts[-1].upper() if len(parts) > 1 else ""
+    seen = set()
+
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        match = re.match(r'\b([A-ZÉÈËÊÀÂÎÏÇ][a-zéèëêàâîïç\-]+)\s+([A-ZÉÈËÊÀÂÎÏÇ][a-zéèëêàâîïç\-]+)\b', line.strip())
+        if match:
+            prenom, nom = match.groups()
+            identity = f"{prenom} {nom}"
+            if identity.lower() in seen:
+                continue
+            seen.add(identity.lower())
+
+            # Vérification des lignes suivantes pour fonction ou date
+            fonction = ""
+            date_naissance = ""
+            for j in range(1, 3):
+                if i + j < len(lines):
+                    next_line = lines[i + j].strip()
+                    if re.search(r'(anëtar|kryetar|membre|président|présidente|member|judge|conseiller)', next_line, re.IGNORECASE):
+                        fonction = next_line
+                    if re.search(r'\b(né[e]? le|born on|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b', next_line, re.IGNORECASE):
+                        date_naissance = next_line
+
             results.append({
-                "identité": line.title(),
-                "nom": nom,
-                "prénom": prenom,
-                "fonction": "",
+                "identité": identity,
+                "nom": nom.upper(),
+                "prénom": prenom.lower(),
+                "fonction": fonction,
                 "pays": "",
-                "date de naissance": ""
+                "date de naissance": date_naissance
             })
+
     return pd.DataFrame(results)
 
-# Interface utilisateur
+# --- Interface utilisateur
 text_input = st.text_area("Collez ici le contenu de la page web :", height=300)
-mode = st.radio("Choisissez le mode d'extraction :", ["Ambassades (Flag of…)", "Liste de noms en MAJUSCULES"])
+mode = st.radio("Choisissez le mode d'extraction :", [
+    "Ambassades (Flag of…)", 
+    "Liste de noms intelligents (format libre)"
+])
 
 if st.button("🔍 Extraire et générer le fichier Excel") and text_input:
     if mode == "Ambassades (Flag of…)":
         df = extract_from_embassy_format(text_input)
     else:
-        df = extract_from_uppercase_names(text_input)
+        df = extract_flexible_names(text_input)
 
     if df.empty:
         st.warning("Aucune identité détectée. Veuillez vérifier le format du texte collé.")
