@@ -10,13 +10,13 @@ Collez ici le contenu d'une page web (copié avec Ctrl+A, Ctrl+C).
 Choisissez le mode d'extraction pour générer un fichier Excel structuré.
 """)
 
-# Liste de mots à exclure (non-noms)
+# Liste noire de mots non-personnes
 blacklist = {
     "court", "trials", "decisions", "public", "republic", "help", "history", "supreme",
     "administrative", "organization", "jurisdiction", "list", "contact", "sitemap"
 }
 
-# Mode 1 : "Flag of..." (ambassades)
+# Mode 1 : Extraction à partir des ambassades
 def extract_from_embassy_format(text):
     results = []
     text = re.sub(r'\s+', ' ', text)
@@ -43,7 +43,7 @@ def extract_from_embassy_format(text):
         })
     return pd.DataFrame(results)
 
-# Mode 2 : ligne par ligne, filtrée, enrichie
+# Mode 2 : Extraction flexible avec filtrage et enrichissement
 def extract_flexible_names(text):
     results = []
     seen = set()
@@ -109,4 +109,6 @@ if st.button("🔍 Extraire et générer le fichier Excel") and text_input:
         st.download_button(
             label="📥 Télécharger le fichier Excel",
             data=buffer,
-            file_name_
+            file_name="identites_extraites.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
