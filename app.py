@@ -10,41 +10,39 @@ Collez ici le contenu d'une page web (copié avec Ctrl+A, Ctrl+C) pour extraire 
 Le fichier Excel généré sera téléchargeable directement ci-dessous.
 """)
 
-# Fonction d'extraction des identités à partir du texte brut
+# Fonction d'extraction mise à jour
 def extract_identities(text):
-    # Nettoyage
     lines = [line.strip() for line in text.splitlines() if line.strip() != ""]
     results = []
 
-    # Exemple d'extraction simplifiée (à adapter selon le format exact de ton texte)
-    for i, line in enumerate(lines):
-        if re.search(r'[A-Z]{2,}\s+[A-Z]{2,}', line):  # détecte les noms en majuscules
-            nom_prenom = line.strip()
-            nom = re.findall(r'([A-Z]{2,})', nom_prenom)[0]
-            prenom = re.findall(r'([A-Z]{2,})', nom_prenom)[1] if len(re.findall(r'([A-Z]{2,})', nom_prenom)) > 1 else ""
-            full_name = f"{prenom.capitalize()} {nom.capitalize()}" if prenom else nom.capitalize()
+    for i in range(len(lines)):
+        line = lines[i]
 
-            fonction, pays, dob = "", "", ""
+        if line.startswith("Flag of"):
+            try:
+                # Extraction des éléments principaux
+                match = re.match(r"Flag of ([A-Za-z\s]+) ([A-Z]?[a-z\'\-\.]+(?:\s[A-Z]?[a-z\'\-\.]+)*)\s+([A-Z\-\'\s]+)\s+-\s+(.+)", line)
+                if match:
+                    country = match.group(1).strip()
+                    firstnames = match.group(2).strip()
+                    lastname = match.group(3).strip()
+                    function = match.group(4).strip()
 
-            # On regarde les lignes suivantes pour chercher les autres infos
-            for j in range(1, 5):
-                if i + j < len(lines):
-                    candidate = lines[i + j].strip()
-                    if re.search(r'\b(n\u00e9 le|date de naissance|DOB|\d{2}/\d{2}/\d{4})', candidate, re.IGNORECASE):
-                        dob = candidate
-                    elif re.search(r'\bFrance|Belgique|Canada|Suisse|Allemagne|Espagne|Italie|\bUSA|\bUK\b', candidate, re.IGNORECASE):
-                        pays = candidate
-                    elif len(candidate.split()) <= 8:
-                        fonction = candidate
+                    full_name = f"{firstnames} {lastname}".strip()
 
-            results.append({
-                "identité": full_name,
-                "nom": nom.upper(),
-                "prénom": prenom.lower(),
-                "fonction": fonction,
-                "pays": pays,
-                "date de naissance": dob
-            })
+                    # Ligne suivante : poste (ambassade ou consulat)
+                    institution = lines[i + 1] if i + 1 < len(lines) else ""
+
+                    results.append({
+                        "identité": full_name,
+                        "nom": lastname.upper(),
+                        "prénom": firstnames.lower(),
+                        "fonction": function,
+                        "pays": country,
+                        "date de naissance": ""
+                    })
+            except Exception as e:
+                continue
 
     return pd.DataFrame(results)
 
