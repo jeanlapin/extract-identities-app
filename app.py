@@ -10,39 +10,36 @@ Collez ici le contenu d'une page web (copié avec Ctrl+A, Ctrl+C) pour extraire 
 Le fichier Excel généré sera téléchargeable directement ci-dessous.
 """)
 
-# Fonction d'extraction mise à jour
 def extract_identities(text):
-    lines = [line.strip() for line in text.splitlines() if line.strip() != ""]
+    # Découpe en blocs à partir de chaque occurrence de "Flag of"
+    blocks = re.split(r"(?=Flag of )", text)
     results = []
 
-    for i in range(len(lines)):
-        line = lines[i]
+    for block in blocks:
+        match = re.match(
+            r"Flag of ([A-Za-z\\s]+)\\s+((Dr\\.|Mr\\.|Mrs\\.|Ms\\.|Miss)?\\s*[A-Z][a-z\\'\\-\\.]+(?:\\s[A-Z][a-z\\'\\-\\.]+)*)\\s+-\\s+([A-Za-z\\s\\'\\-]+)",
+            block.strip()
+        )
 
-        if line.startswith("Flag of"):
-            try:
-                # Extraction des éléments principaux
-                match = re.match(r"Flag of ([A-Za-z\s]+) ([A-Z]?[a-z\'\-\.]+(?:\s[A-Z]?[a-z\'\-\.]+)*)\s+([A-Z\-\'\s]+)\s+-\s+(.+)", line)
-                if match:
-                    country = match.group(1).strip()
-                    firstnames = match.group(2).strip()
-                    lastname = match.group(3).strip()
-                    function = match.group(4).strip()
+        if match:
+            country = match.group(1).strip()
+            fullname = match.group(2).strip()
+            fonction = match.group(4).strip()
 
-                    full_name = f"{firstnames} {lastname}".strip()
+            # Nettoyage nom/prénom
+            fullname_clean = re.sub(r'^(Dr\\.|Mr\\.|Mrs\\.|Ms\\.|Miss)\\s+', '', fullname)
+            parts = fullname_clean.strip().split()
+            prenom = parts[0] if parts else ""
+            nom = parts[-1] if len(parts) > 1 else ""
 
-                    # Ligne suivante : poste (ambassade ou consulat)
-                    institution = lines[i + 1] if i + 1 < len(lines) else ""
-
-                    results.append({
-                        "identité": full_name,
-                        "nom": lastname.upper(),
-                        "prénom": firstnames.lower(),
-                        "fonction": function,
-                        "pays": country,
-                        "date de naissance": ""
-                    })
-            except Exception as e:
-                continue
+            results.append({
+                "identité": fullname_clean,
+                "nom": nom.upper(),
+                "prénom": prenom.lower(),
+                "fonction": fonction,
+                "pays": country,
+                "date de naissance": ""
+            })
 
     return pd.DataFrame(results)
 
