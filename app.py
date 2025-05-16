@@ -10,13 +10,13 @@ Collez ici le contenu d'une page web (copié avec Ctrl+A, Ctrl+C).
 Choisissez le mode d'extraction pour générer un fichier Excel structuré.
 """)
 
-# --- Liste noire de mots qui ne sont pas des noms de personnes
+# Liste de mots à exclure (non-noms)
 blacklist = {
     "court", "trials", "decisions", "public", "republic", "help", "history", "supreme",
     "administrative", "organization", "jurisdiction", "list", "contact", "sitemap"
 }
 
-# --- Mode 1 : Extraction "Flag of ..." (ambassades)
+# Mode 1 : "Flag of..." (ambassades)
 def extract_from_embassy_format(text):
     results = []
     text = re.sub(r'\s+', ' ', text)
@@ -43,7 +43,7 @@ def extract_from_embassy_format(text):
         })
     return pd.DataFrame(results)
 
-# --- Mode 2 : Extraction intelligente ligne par ligne avec filtre
+# Mode 2 : ligne par ligne, filtrée, enrichie
 def extract_flexible_names(text):
     results = []
     seen = set()
@@ -54,63 +54,59 @@ def extract_flexible_names(text):
         if not line:
             continue
 
-        # Ne garder que les lignes avec deux mots, chacun commençant par une majuscule
-        match = re.match(r'^([A-ZÉÈËÊÀÂÎÏÇ][a-zéèëêàâîïç\'\\-]+)\\s+([A-ZÉÈËÊÀÂÎÏÇ][a-zéèëêàâîïç\'\\-]+)$', line)
+        match = re.match(r'^([A-ZÉÈËÊÀÂÎÏÇ][a-zéèëêàâîïç\'\-]+)\s+([A-ZÉÈËÊÀÂÎÏÇ][a-zéèëêàâîïç\'\-]+)$', line)
         if match:
             prenom, nom = match.groups()
             if prenom.lower() in blacklist or nom.lower() in blacklist:
                 continue
 
-            identity = f\"{prenom} {nom}\"
+            identity = f"{prenom} {nom}"
             if identity.lower() in seen:
                 continue
             seen.add(identity.lower())
 
-            # Vérifie les lignes suivantes pour fonction et date de naissance
-            fonction = \"\"
-            date_naissance = \"\"
+            fonction = ""
+            date_naissance = ""
             for j in range(1, 3):
                 if i + j < len(lines):
                     next_line = lines[i + j].strip()
                     if re.search(r'(anëtar|kryetar|membre|président|présidente|member|judge|conseiller)', next_line, re.IGNORECASE):
                         fonction = next_line
-                    if re.search(r'\\b(né[e]? le|born on|\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})\\b', next_line, re.IGNORECASE):
+                    if re.search(r'\b(né[e]? le|born on|\d{1,2}[/-]\d{1,2}[/-]\d{2,4})\b', next_line, re.IGNORECASE):
                         date_naissance = next_line
 
             results.append({
-                \"identité\": identity,
-                \"nom\": nom.upper(),
-                \"prénom\": prenom.lower(),
-                \"fonction\": fonction,
-                \"pays\": \"\",
-                \"date de naissance\": date_naissance
+                "identité": identity,
+                "nom": nom.upper(),
+                "prénom": prenom.lower(),
+                "fonction": fonction,
+                "pays": "",
+                "date de naissance": date_naissance
             })
 
     return pd.DataFrame(results)
 
-# --- Interface utilisateur
-text_input = st.text_area(\"Collez ici le contenu de la page web :\", height=300)
-mode = st.radio(\"Choisissez le mode d'extraction :\", [
-    \"Ambassades (Flag of…)\",
-    \"Liste de noms intelligents (format libre)\"
+# Interface utilisateur
+text_input = st.text_area("Collez ici le contenu de la page web :", height=300)
+mode = st.radio("Choisissez le mode d'extraction :", [
+    "Ambassades (Flag of…)",
+    "Liste de noms intelligents (format libre)"
 ])
 
-if st.button(\"🔍 Extraire et générer le fichier Excel\") and text_input:
-    if mode == \"Ambassades (Flag of…)\":
+if st.button("🔍 Extraire et générer le fichier Excel") and text_input:
+    if mode == "Ambassades (Flag of…)":
         df = extract_from_embassy_format(text_input)
     else:
         df = extract_flexible_names(text_input)
 
     if df.empty:
-        st.warning(\"Aucune identité détectée. Veuillez vérifier le format du texte collé.\")
+        st.warning("Aucune identité détectée. Veuillez vérifier le format du texte collé.")
     else:
-        st.success(f\"{len(df)} identité(s) extraites.\")
+        st.success(f"{len(df)} identité(s) extraites.")
         buffer = BytesIO()
         df.to_excel(buffer, index=False, engine='openpyxl')
         buffer.seek(0)
         st.download_button(
-            label=\"📥 Télécharger le fichier Excel\",
+            label="📥 Télécharger le fichier Excel",
             data=buffer,
-            file_name=\"identites_extraites.xlsx\",
-            mime=\"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\"
-        )
+            file_name_
